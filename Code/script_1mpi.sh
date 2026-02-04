@@ -20,4 +20,4 @@
 module add openmpi/5.0.3-et6p
 
 # Submit
-srun --mpi=pmix_v2 ./test -10 44 0.5
+srun --mpi=pmix_v2 ./test 10 44 0.6

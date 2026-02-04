@@ -1,2 +1,0 @@
-cpu-bind=MASK - bp1-compute189, task  0  0 [1944910]: mask 0x100000001 set
-cpu-bind=MASK - bp1-compute189, task  0  0 [1944936]: mask 0x100000001 set

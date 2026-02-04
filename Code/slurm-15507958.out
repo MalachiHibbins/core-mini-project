@@ -1,0 +1,68 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [1964990]: mask 0x100000001 set
+cpu-bind=MASK - bp1-compute189, task  0  0 [1965016]: mask 0x100000001 set
+. . . B B B . . B B 
+T . T . . T T . T T 
+T T . . T . T . . T 
+. . . . . . . . . T 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+After iteration 1:
+. . . X X X . . X X 
+T . T . . B T . B B 
+T T . . T . T . . T 
+. . . . . . . . . T 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+After iteration 2:
+. . . X X X . . X X 
+T . T . . X B . X X 
+T T . . T . T . . B 
+. . . . . . . . . T 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+After iteration 3:
+. . . X X X . . X X 
+T . T . . X X . X X 
+T T . . T . B . . X 
+. . . . . . . . . B 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+After iteration 4:
+. . . X X X . . X X 
+T . T . . X X . X X 
+T T . . T . X . . X 
+. . . . . . . . . X 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+After iteration 5:
+. . . X X X . . X X 
+T . T . . X X . X X 
+T T . . T . X . . X 
+. . . . . . . . . X 
+. T . . . . T T T . 
+. T . T . . . T T . 
+T T . T T T T T T . 
+. . T . . T T . . T 
+. T T T . T T T . . 
+T . T . T T T T . T 
+No changes in the grid, stopping simulation.
