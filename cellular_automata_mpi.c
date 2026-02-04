@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
 #include <mpi.h>
 
 #define ALIVE 1
