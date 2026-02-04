@@ -3,9 +3,15 @@
 cellular_automata_mpi
 output.txt
 *_output.txt
+glider_step*.txt
+demo_*.txt
+demo.sh
 
 # Test output files (but not example test files)
 /test*.txt
+
+# CodeQL
+_codeql_detected_source_root
 
 # Editor files
 *.swp
