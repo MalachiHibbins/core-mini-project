@@ -1,0 +1,17 @@
+# Build artifacts
+*.o
+cellular_automata_mpi
+output.txt
+*_output.txt
+test*.txt
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.iml

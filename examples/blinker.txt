@@ -1,0 +1,7 @@
+# Blinker pattern (5x5 grid)
+# This is an oscillator with period 2
+0 0 0 0 0
+0 0 1 0 0
+0 0 1 0 0
+0 0 1 0 0
+0 0 0 0 0

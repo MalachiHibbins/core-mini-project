@@ -1,0 +1,7 @@
+# Glider pattern (5x5 grid)
+# This is a simple pattern that moves diagonally in Conway's Game of Life
+0 0 0 0 0
+0 0 1 0 0
+0 0 0 1 0
+0 1 1 1 0
+0 0 0 0 0
