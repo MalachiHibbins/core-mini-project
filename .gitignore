@@ -3,7 +3,9 @@
 cellular_automata_mpi
 output.txt
 *_output.txt
-test*.txt
+
+# Test output files (but not example test files)
+/test*.txt
 
 # Editor files
 *.swp

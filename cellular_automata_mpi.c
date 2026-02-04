@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <mpi.h>
 
 #define ALIVE 1
@@ -47,9 +48,11 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
             iterations = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
-            strcpy(input_file, argv[++i]);
+            strncpy(input_file, argv[++i], sizeof(input_file) - 1);
+            input_file[sizeof(input_file) - 1] = '\0';
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-            strcpy(output_file, argv[++i]);
+            strncpy(output_file, argv[++i], sizeof(output_file) - 1);
+            output_file[sizeof(output_file) - 1] = '\0';
         }
     }
     
@@ -70,6 +73,9 @@ int main(int argc, char *argv[]) {
     
     // Initialize the grid
     if (rank == 0) {
+        // Seed random number generator
+        srand(time(NULL));
+        
         // Rank 0 initializes the full grid
         int **full_grid = allocate_grid(total_rows, cols);
         
@@ -172,8 +178,22 @@ int main(int argc, char *argv[]) {
 /* Allocate a 2D grid */
 int **allocate_grid(int rows, int cols) {
     int **grid = (int **)malloc(rows * sizeof(int *));
+    if (grid == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for grid rows\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    
     for (int i = 0; i < rows; i++) {
         grid[i] = (int *)calloc(cols, sizeof(int));
+        if (grid[i] == NULL) {
+            fprintf(stderr, "Error: Failed to allocate memory for grid row %d\n", i);
+            // Free previously allocated rows
+            for (int j = 0; j < i; j++) {
+                free(grid[j]);
+            }
+            free(grid);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
     }
     return grid;
 }

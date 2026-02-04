@@ -5,6 +5,10 @@ echo "Testing MPI Cellular Automata Implementation"
 echo "=============================================="
 echo ""
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 # Color codes for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -16,7 +20,7 @@ FAILED=0
 
 # Test 1: Single process run
 echo "Test 1: Single process run (baseline)"
-mpirun --allow-run-as-root -np 1 $PWD/cellular_automata_mpi -r 10 -c 10 -i 5 -o test1_np1.txt > /dev/null 2>&1
+mpirun --allow-run-as-root -np 1 ./cellular_automata_mpi -r 10 -c 10 -i 5 -o test1_np1.txt > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Test 1 passed${NC}"
     PASSED=$((PASSED + 1))
@@ -27,7 +31,7 @@ fi
 
 # Test 2: Two process run with same parameters
 echo "Test 2: Two process run"
-mpirun --allow-run-as-root -np 2 $PWD/cellular_automata_mpi -r 10 -c 10 -i 5 -o test2_np2.txt > /dev/null 2>&1
+mpirun --allow-run-as-root -np 2 ./cellular_automata_mpi -r 10 -c 10 -i 5 -o test2_np2.txt > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Test 2 passed${NC}"
     PASSED=$((PASSED + 1))
@@ -38,7 +42,7 @@ fi
 
 # Test 3: Four process run
 echo "Test 3: Four process run"
-mpirun --allow-run-as-root --oversubscribe -np 4 $PWD/cellular_automata_mpi -r 20 -c 20 -i 10 -o test3_np4.txt > /dev/null 2>&1
+mpirun --allow-run-as-root --oversubscribe -np 4 ./cellular_automata_mpi -r 20 -c 20 -i 10 -o test3_np4.txt > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Test 3 passed${NC}"
     PASSED=$((PASSED + 1))
@@ -49,7 +53,7 @@ fi
 
 # Test 4: Large grid test
 echo "Test 4: Large grid (100x100)"
-mpirun --allow-run-as-root --oversubscribe -np 4 $PWD/cellular_automata_mpi -r 100 -c 100 -i 50 -o test4_large.txt > /dev/null 2>&1
+mpirun --allow-run-as-root --oversubscribe -np 4 ./cellular_automata_mpi -r 100 -c 100 -i 50 -o test4_large.txt > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Test 4 passed${NC}"
     PASSED=$((PASSED + 1))
@@ -60,7 +64,7 @@ fi
 
 # Test 5: Input file test
 echo "Test 5: Input file (glider pattern)"
-mpirun --allow-run-as-root -np 2 $PWD/cellular_automata_mpi -f examples/glider.txt -r 5 -c 5 -i 10 -o test5_glider.txt > /dev/null 2>&1
+mpirun --allow-run-as-root -np 2 ./cellular_automata_mpi -f examples/glider.txt -r 5 -c 5 -i 10 -o test5_glider.txt > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Test 5 passed${NC}"
     PASSED=$((PASSED + 1))
