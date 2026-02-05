@@ -1,0 +1,4 @@
+Running with 1 MPI processes
+Burning steps: 1
+Bottom reached: No
+Execution time: 0.000156506 seconds

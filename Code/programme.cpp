@@ -17,10 +17,13 @@ int Get1dIndex(int i, int j, int k, int N){
   return i * N + j;
 }
 
-void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid){
-  // processes one time step of the simulation
+void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid, int j0, int j1, int iproc, int nproc){
+  // ============================================
+  // Update the grid according to the rules of the model for 1 time step.
+  // ============================================
+  // Initialize to zeros - each process updates only its assigned cells  
   for (int i=0;i<N;i++){
-    for (int j=0;j<N;j++){
+    for (int j=j0;j<j1;j++){
       // convert 2D index to 1D index
       int ind = Get1dIndex(i, j, 0, N);
       int state = old_grid[ind];
@@ -70,10 +73,24 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
       else if (state == burning){
         new_grid[ind] = burnt;
       }
+      else if (state == burnt){
+        new_grid[ind] = burnt;
+      }
        
     }
   }
-
+  // ============================================
+  // Communicate the updated grid: combine each process's
+  // `new_grid` (local updates) into `old_grid` (global state).
+  // ============================================
+  if (nproc > 1){
+    // combine all new_grid locals and store the result in old_grid
+    // use SUM since each cell is updated by exactly one process (others leave it at 0)
+    MPI_Allreduce(new_grid.data(), old_grid.data(), N*N, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  }
+  else{
+    old_grid = new_grid;
+  }
 }
 
 int GenerateRandomState(float probability){
@@ -141,11 +158,40 @@ void DisplayGrid(const std::vector<int>& grid, int N) {
     }
 }
 
+void distribute_grid(int N, int iproc, int nproc, int& i0, int& i1){
+  // ============================================
+  // Distribute the grid among processes by dividing into 2D slices. Each process gets a contiguous block
+  // ============================================
+  int n_slices = N / nproc;
+  int remainder = N % nproc;
+  if (iproc < remainder){
+    i0 = iproc * (n_slices + 1);
+    i1 = i0 + n_slices + 1;
+  } else {
+    i0 = iproc * n_slices + remainder;
+    i1 = i0 + n_slices;
+  }
+}
+
 int main(int argc, char* argv[]){
-    
 
     // =========================================
-    // Organise inputs and generate grid
+    // Initialise MPI
+    // =========================================
+
+    // initialise MPI
+    MPI_Init(&argc, &argv);
+
+    // Get the number of processes in MPI_COMM_WORLD
+    int nproc;
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+    // get the rank of this process in MPI_COMM_WORLD
+    int iproc;
+    MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
+
+    // =========================================
+    // Organise inputs and generate/load grid on root process
     // =========================================
 
     double start = MPI_Wtime();
@@ -153,42 +199,70 @@ int main(int argc, char* argv[]){
     int N;
     bool draw_grid = false;
 
-    // Argument parsing
-    if (argc != 5 && argc != 3) {
-        std::cerr << "Error: Incorrect number of arguments." << std::endl;
-        std::cerr << "Usage 1 (random grid mode): " << argv[0] << " <N> <seed> <probability> <draw_grid>" << std::endl;
-        std::cerr << "Usage 2 (read file mode): " << argv[0] << " <filename> <draw_grid>" << std::endl;
-        return 1;
-    }
-
-    else if (argc == 5){
-
-      N = atoi(argv[1]);
-      int seed = atoi(argv[2]);
-      float probability = atof(argv[3]);
-      draw_grid = atoi(argv[4]) != 0;
-      
-      // Input validation
-      if (N <= 0) {
-          std::cerr << "Error: N must be a positive integer (got " << N << ")" << std::endl;
+    if (iproc == 0) {
+        std::cout << "Running with " << nproc << " MPI processes" << std::endl;
+    
+      // Argument parsing
+      if (argc != 5 && argc != 3) {
+          std::cerr << "Error: Incorrect number of arguments." << std::endl;
+          std::cerr << "Usage 1 (random grid mode): " << argv[0] << " <N> <seed> <probability> <draw_grid>" << std::endl;
+          std::cerr << "Usage 2 (read file mode): " << argv[0] << " <filename> <draw_grid>" << std::endl;
           return 1;
       }
-      
-      if (probability < 0.0 || probability > 1.0) {
-          std::cerr << "Error: probability must be between 0.0 and 1.0 (got " << probability << ")" << std::endl;
-          return 1;
-      }
-      
-      // Generate initial grid from random
-      states_old = GenerateGrid(N, seed, probability);
-      }
 
-    else{
-      // Read grid from file
-      std::string filename = argv[1];
-      states_old = ReadGridFromFile(filename, N);
-      draw_grid = atoi(argv[2]) != 0;
+      else if (argc == 5){
+
+        N = atoi(argv[1]);
+        int seed = atoi(argv[2]);
+        float probability = atof(argv[3]);
+        draw_grid = atoi(argv[4]) != 0;
+        
+        // Input validation
+        if (N <= 0) {
+            std::cerr << "Error: N must be a positive integer (got " << N << ")" << std::endl;
+            return 1;
+        }
+        
+        if (probability < 0.0 || probability > 1.0) {
+            std::cerr << "Error: probability must be between 0.0 and 1.0 (got " << probability << ")" << std::endl;
+            return 1;
+        }
+        
+        // Generate initial grid from random
+        states_old = GenerateGrid(N, seed, probability);
+        }
+
+      else{
+        // Read grid from file
+        std::string filename = argv[1];
+        states_old = ReadGridFromFile(filename, N);
+        draw_grid = atoi(argv[2]) != 0;
+      }
     }
+
+    // =========================================
+    // Broadcast entire grid size to all processes
+    // =========================================
+
+    // broadcast the data
+    if (nproc > 1){
+      // first share the image size
+      MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      // resize the vector on non-root processes
+      if (iproc != 0){
+        states_old.resize(N*N);
+      }
+      // now broadcast the actual grid data
+      MPI_Bcast(states_old.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);      
+    }
+
+    // =========================================
+    // Distribute the grid among processes
+    // =========================================
+
+    // divide the rows among MPI tasks
+    int i0, i1;
+    distribute_grid(N, iproc, nproc, i0, i1);
 
     // =========================================
     // Run the simulation
@@ -198,41 +272,51 @@ int main(int argc, char* argv[]){
     bool bottom_reached = false;
 
     // run simulation until no changes occur or max iterations reached
+    // check that the tasks stay in sync
+    MPI_Barrier(MPI_COMM_WORLD);
 
     std::vector<int> states_new(N*N, 0);
-    for (int iter=0;iter<N*N/2;iter++){
-        Model(N, states_old, states_new);
-        if (states_new == states_old) {
-            break;
-        }
-        if (draw_grid) {
-            std::cout << "=========================================" << std::endl;
-            std::cout << "Step " << iter+1 << ":" << std::endl;
-            std::cout << "=========================================" << std::endl;
-            DisplayGrid(states_new, N);
-        }
-        states_old = states_new; 
+    while (true) {
         burning_steps++;
+        Model(N, states_old, states_new, i0, i1, iproc, nproc);
+        if (burning_steps == N) {
+          break;
+        }
+        if (draw_grid && iproc == 0) {
+          std::cout << "=========================================" << std::endl;
+          std::cout << "Step " << burning_steps << ":" << std::endl;
+          std::cout << "=========================================" << std::endl;
+          DisplayGrid(states_old, N);
+        }
     }
+
+    // check that the tasks stay in sync
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // check if bottom row on fire
-    for (int j=0;j<N;j++){
-        if (states_old[(N-1)*N + j] == burning || states_old[(N-1)*N + j] == burnt){
-            bottom_reached = true;
-            break;
-        }
+    if (iproc == 0){
+      for (int j=0;j<N;j++){
+          if (states_old[(N-1)*N + j] == burning || states_old[(N-1)*N + j] == burnt){
+              bottom_reached = true;
+              break;
+          }
+      }
     }
 
     // =========================================
     // Output results
     // =========================================
 
-    // Output results
-    double end = MPI_Wtime();
-    std::cout << "Burning steps: " << burning_steps << std::endl;
-    std::cout << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
-    std::cout << "Execution time: " << end - start << " seconds" << std::endl;
-
+    if (iproc == 0){
+      // Output results
+      double end = MPI_Wtime();
+      std::cout << "Burning steps: " << burning_steps << std::endl;
+      std::cout << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
+      std::cout << "Execution time: " << end - start << " seconds" << std::endl;
+    }
+    
+    // finalise MPI
+    MPI_Finalize();
     return 0;
 }
 

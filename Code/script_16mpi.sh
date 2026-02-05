@@ -7,10 +7,10 @@
 ## saving you from modifying each of these scripts individually.                            ##
 ##############################################################################################
 
-#SBATCH --job-name=image_1mpi
+#SBATCH --job-name=image_16mpi
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:00:10
 #SBATCH --mem-per-cpu=100M
