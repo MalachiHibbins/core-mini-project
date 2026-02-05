@@ -4,7 +4,7 @@
 #include <fstream>  
 #include <iostream>
 #include <cmath>
-//#include <mpi.h>
+#include <mpi.h>
 
 int empty = 0;
 int alive = 1;
@@ -13,14 +13,15 @@ int burnt = 3;
 
 
 int Get1dIndex(int i, int j, int k, int N){
+  // converts 2D index to 1D index
   return i * N + j;
 }
 
 void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid){
-
+  // processes one time step of the simulation
   for (int i=0;i<N;i++){
     for (int j=0;j<N;j++){
-       
+      // convert 2D index to 1D index
       int ind = Get1dIndex(i, j, 0, N);
       int state = old_grid[ind];
       
@@ -31,24 +32,28 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
         // check neighbours for fire
         bool neighbour_on_fire = false;
         if (i > 0){
+          // check up
           int ind_up = Get1dIndex(i-1, j, 0, N);
           if (old_grid[ind_up] == burning){
             neighbour_on_fire = true;
           }
         }
         if (i < N-1){
+          // check down
           int ind_down = Get1dIndex(i+1, j, 0, N);
           if (old_grid[ind_down] == burning){
             neighbour_on_fire = true;
           }
         }     
         if (j > 0){
+          // check left
           int ind_left = Get1dIndex(i, j-1, 0, N);
           if (old_grid[ind_left] == burning){
             neighbour_on_fire = true;
           }
         }     
         if (j < N-1){
+          // check right
           int ind_right = Get1dIndex(i, j+1, 0, N);
           if (old_grid[ind_right] == burning){
             neighbour_on_fire = true;
@@ -82,7 +87,8 @@ int GenerateRandomState(float probability){
 
 
 std::vector < int > GenerateGrid(int N, int seed, float probability){
-    // Creates the grid
+    // Creates the grid with each cell being a tree with given probability. Trees in the top row are set on fire.
+    
     std::vector < int > grid(N*N, 0);
     srand(seed);  // Seed once at the start
     for (int i=0;i<N*N;i++){
@@ -91,6 +97,34 @@ std::vector < int > GenerateGrid(int N, int seed, float probability){
     for (int i=0;i<N;i++){
         if (grid[i] == alive) {
             grid[i] = burning;
+        }
+    }
+    return grid;
+}
+
+std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
+    // ============================================
+    // Read in grid file separated by spaces.
+    // ============================================
+
+    // check file exists
+    std::ifstream infile(filename);
+    if (!infile) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        exit(1);
+    }
+
+    N = 6;
+    // read grid values into vector
+    std::vector<int> grid(N * N);
+    for (int i = 0; i < N * N; ++i) {
+        infile >> grid[i];
+    }
+
+    // set the first row of the grid on fire
+    for (int j = 0; j < N; ++j) {
+        if (grid[j] == alive) {
+            grid[j] = burning;
         }
     }
     return grid;
@@ -108,39 +142,97 @@ void DisplayGrid(const std::vector<int>& grid, int N) {
 }
 
 int main(int argc, char* argv[]){
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <N> <seed> <probability>" << std::endl;
+    
+
+    // =========================================
+    // Organise inputs and generate grid
+    // =========================================
+
+    double start = MPI_Wtime();
+    std::vector<int> states_old;
+    int N;
+    bool draw_grid = false;
+
+    // Argument parsing
+    if (argc != 5 && argc != 3) {
+        std::cerr << "Error: Incorrect number of arguments." << std::endl;
+        std::cerr << "Usage 1 (random grid mode): " << argv[0] << " <N> <seed> <probability> <draw_grid>" << std::endl;
+        std::cerr << "Usage 2 (read file mode): " << argv[0] << " <filename> <draw_grid>" << std::endl;
         return 1;
     }
-    
-    int N = atoi(argv[1]);
-    int seed = atoi(argv[2]);
-    float probability = atof(argv[3]);
-    
-    // Input validation
-    if (N <= 0) {
-        std::cerr << "Error: N must be a positive integer (got " << N << ")" << std::endl;
-        return 1;
+
+    else if (argc == 5){
+
+      N = atoi(argv[1]);
+      int seed = atoi(argv[2]);
+      float probability = atof(argv[3]);
+      draw_grid = atoi(argv[4]) != 0;
+      
+      // Input validation
+      if (N <= 0) {
+          std::cerr << "Error: N must be a positive integer (got " << N << ")" << std::endl;
+          return 1;
+      }
+      
+      if (probability < 0.0 || probability > 1.0) {
+          std::cerr << "Error: probability must be between 0.0 and 1.0 (got " << probability << ")" << std::endl;
+          return 1;
+      }
+      
+      // Generate initial grid from random
+      states_old = GenerateGrid(N, seed, probability);
+      }
+
+    else{
+      // Read grid from file
+      std::string filename = argv[1];
+      states_old = ReadGridFromFile(filename, N);
+      draw_grid = atoi(argv[2]) != 0;
     }
+
+    // =========================================
+    // Run the simulation
+    // =========================================
     
-    if (probability < 0.0 || probability > 1.0) {
-        std::cerr << "Error: probability must be between 0.0 and 1.0 (got " << probability << ")" << std::endl;
-        return 1;
-    }
-    
-    std::vector<int> states_old = GenerateGrid(N, seed, probability);
-    DisplayGrid(states_old, N);
+    int burning_steps = 0;
+    bool bottom_reached = false;
+
+    // run simulation until no changes occur or max iterations reached
+
     std::vector<int> states_new(N*N, 0);
     for (int iter=0;iter<N*N/2;iter++){
         Model(N, states_old, states_new);
-        std::cout << "After iteration " << iter+1 << ":" << std::endl;
         if (states_new == states_old) {
-            std::cout << "No changes in the grid, stopping simulation." << std::endl;
             break;
         }
-        DisplayGrid(states_new, N);
-        states_old = states_new;  // Update for the next iteration
+        if (draw_grid) {
+            std::cout << "=========================================" << std::endl;
+            std::cout << "Step " << iter+1 << ":" << std::endl;
+            std::cout << "=========================================" << std::endl;
+            DisplayGrid(states_new, N);
+        }
+        states_old = states_new; 
+        burning_steps++;
     }
+
+    // check if bottom row on fire
+    for (int j=0;j<N;j++){
+        if (states_old[(N-1)*N + j] == burning || states_old[(N-1)*N + j] == burnt){
+            bottom_reached = true;
+            break;
+        }
+    }
+
+    // =========================================
+    // Output results
+    // =========================================
+
+    // Output results
+    double end = MPI_Wtime();
+    std::cout << "Burning steps: " << burning_steps << std::endl;
+    std::cout << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
+    std::cout << "Execution time: " << end - start << " seconds" << std::endl;
+
     return 0;
 }
 
