@@ -1,0 +1,24 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [2193018]: mask 0xff000000ff set
+cpu-bind=MASK - bp1-compute189, task  0  0 [2193044]: mask 0x1 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [2193045]: mask 0x100000000 set
+cpu-bind=MASK - bp1-compute189, task  2  2 [2193046]: mask 0x2 set
+cpu-bind=MASK - bp1-compute189, task  3  3 [2193047]: mask 0x200000000 set
+cpu-bind=MASK - bp1-compute189, task  4  4 [2193048]: mask 0x4 set
+cpu-bind=MASK - bp1-compute189, task  5  5 [2193049]: mask 0x400000000 set
+cpu-bind=MASK - bp1-compute189, task  6  6 [2193050]: mask 0x8 set
+cpu-bind=MASK - bp1-compute189, task  7  7 [2193051]: mask 0x800000000 set
+cpu-bind=MASK - bp1-compute189, task  8  8 [2193052]: mask 0x10 set
+cpu-bind=MASK - bp1-compute189, task  9  9 [2193053]: mask 0x1000000000 set
+cpu-bind=MASK - bp1-compute189, task 10 10 [2193054]: mask 0x20 set
+cpu-bind=MASK - bp1-compute189, task 11 11 [2193055]: mask 0x2000000000 set
+cpu-bind=MASK - bp1-compute189, task 12 12 [2193056]: mask 0x40 set
+cpu-bind=MASK - bp1-compute189, task 13 13 [2193057]: mask 0x4000000000 set
+cpu-bind=MASK - bp1-compute189, task 14 14 [2193058]: mask 0x80 set
+cpu-bind=MASK - bp1-compute189, task 15 15 [2193059]: mask 0x8000000000 set
+Running with 16 MPI processes
+Burning steps: 2388
+Bottom reached: No
+Execution time: 5.65358 seconds
+Setup time: 0.0257294 seconds
+Broadcast time: 0.00612475 seconds
+Model time: 5.62161 seconds

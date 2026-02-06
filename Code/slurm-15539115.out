@@ -1,0 +1,9 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [2192774]: mask 0x100000001 set
+cpu-bind=MASK - bp1-compute189, task  0  0 [2192800]: mask 0x100000001 set
+Running with 1 MPI processes
+Burning steps: 2388
+Bottom reached: Yes
+Execution time: 15.3294 seconds
+Setup time: 0.016505 seconds
+Broadcast time: 4.9e-08 seconds
+Model time: 15.3129 seconds

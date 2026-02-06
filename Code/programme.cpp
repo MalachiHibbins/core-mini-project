@@ -17,11 +17,28 @@ int Get1dIndex(int i, int j, int k, int N){
   return i * N + j;
 }
 
-void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid, int i0, int i1, int iproc, int nproc){
+// Forward declaration
+void distribute_grid(int N, int iproc, int nproc, int& i0, int& i1);
+
+std::vector <int> CombineGrids(int N, std::vector < int > & grid, int i0, int i1, int iproc, int nproc){
+  std::vector<int> combined_grid(N*N, 0);
+  if (nproc > 1){
+    // do a reduction 
+    MPI_Allreduce(grid.data(), combined_grid.data(), N*N, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return combined_grid;
+  }
+  else{
+    // only have 1 MPI task
+    return grid;
+  }
+}
+
+void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid, int i0, int i1, int iproc, int nproc, std::vector<int> & ghost_row_above, std::vector<int> & ghost_row_below, bool & changes_made){
   // ============================================
   // Update the grid according to the rules of the model for 1 time step.
+  // Each process updates only its assigned rows [i0, i1)
   // ============================================
-  // Initialize to zeros - each process updates only its assigned cells  
+  changes_made = false;
   for (int i=i0;i<i1;i++){
     for (int j=0;j<N;j++){
       // convert 2D index to 1D index
@@ -34,20 +51,39 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
       else if (state == alive){
         // check neighbours for fire
         bool neighbour_on_fire = false;
+        
+        // Check up - use ghost row if at boundary
         if (i > 0){
-          // check up
-          int ind_up = Get1dIndex(i-1, j, 0, N);
-          if (old_grid[ind_up] == burning){
-            neighbour_on_fire = true;
+          if (i == i0 && iproc > 0){
+            // At top of my rows, check ghost from above
+            if (ghost_row_above[j] == burning){
+              neighbour_on_fire = true;
+            }
+          } else if (i > i0){
+            // Within my rows
+            int ind_up = Get1dIndex(i-1, j, 0, N);
+            if (old_grid[ind_up] == burning){
+              neighbour_on_fire = true;
+            }
           }
         }
+        
+        // Check down - use ghost row if at boundary
         if (i < N-1){
-          // check down
-          int ind_down = Get1dIndex(i+1, j, 0, N);
-          if (old_grid[ind_down] == burning){
-            neighbour_on_fire = true;
+          if (i == i1-1 && iproc < nproc-1){
+            // At bottom of my rows, check ghost from below
+            if (ghost_row_below[j] == burning){
+              neighbour_on_fire = true;
+            }
+          } else if (i < i1-1){
+            // Within my rows
+            int ind_down = Get1dIndex(i+1, j, 0, N);
+            if (old_grid[ind_down] == burning){
+              neighbour_on_fire = true;
+            }
           }
-        }     
+        }
+        
         if (j > 0){
           // check left
           int ind_left = Get1dIndex(i, j-1, 0, N);
@@ -65,6 +101,7 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
         
         if (neighbour_on_fire){
           new_grid[ind] = burning;
+          changes_made = true;
         }
         else{
           new_grid[ind] = alive;
@@ -72,25 +109,15 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
       }
       else if (state == burning){
         new_grid[ind] = burnt;
+        changes_made = true;
       }
       else if (state == burnt){
         new_grid[ind] = burnt;
       }
-       
+      
     }
   }
-  // ============================================
-  // Communicate the updated grid: combine each process's
-  // `new_grid` (local updates) into `old_grid` (global state).
-  // ============================================
-  if (nproc > 1){
-    // combine all new_grid locals and store the result in old_grid
-    // use SUM since each cell is updated by exactly one process (others leave it at 0)
-    MPI_Allreduce(new_grid.data(), old_grid.data(), N*N, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-  }
-  else{
-    old_grid = new_grid;
-  }
+  MPI_Allreduce(MPI_IN_PLACE, &changes_made, 1, MPI_CXX_BOOL, MPI_LOR, MPI_COMM_WORLD);
 }
 
 int GenerateRandomState(float probability){
@@ -102,6 +129,14 @@ int GenerateRandomState(float probability){
     return empty;
 }
 
+void SetFirstColumnOnFire(std::vector<int>& grid, int N){
+    // Sets the first column of the grid on fire
+    for (int i=0;i<N;i++){
+        if (grid[i * N] == alive) {
+            grid[i * N] = burning;
+        }
+    }
+}
 
 std::vector < int > GenerateGrid(int N, int seed, float probability){
     // Creates the grid with each cell being a tree with given probability. Trees in the top row are set on fire.
@@ -112,11 +147,7 @@ std::vector < int > GenerateGrid(int N, int seed, float probability){
         grid[i] = GenerateRandomState(probability);
     }
     // set the first column of the grid on fire
-    for (int i=0;i<N;i++){
-        if (grid[i * N] == alive) {
-            grid[i * N] = burning;
-        }
-    }
+    SetFirstColumnOnFire(grid, N);
     return grid;
 }
 
@@ -134,24 +165,24 @@ std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
 
     N = 6;
     // read grid values into vector
+    // read columns in as rows (i.e. first N values are row 0, next N values are row 1 etc.)
     std::vector<int> grid(N * N);
     for (int i = 0; i < N * N; ++i) {
-        infile >> grid[i];
+        int col = i / N;  // Which column 
+        int row = i % N;  // Which row within that column
+        infile >> grid[row * N + col];  // Store transposed (column becomes row)
     }
 
     // set the first column of the grid on fire
-    for (int i = 0; i < N; ++i) {
-        if (grid[i * N] == alive) {
-            grid[i * N] = burning;
-        }
-    }
+    SetFirstColumnOnFire(grid, N);
     return grid;
 }
 
-void DisplayGrid(const std::vector<int>& grid, int N) {
+void DisplayGrid(const std::vector<int>& grid, int N){
+    // Displays the grid transposed (rows become columns, columns become rows)
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < N; ++j) {
-            int state = grid[i * N + j];
+            int state = grid[j * N + i];  // Transpose: swap i and j indices
             char display_char = (state == empty) ? '.' : (state == alive) ? 'T' : (state == burning) ? 'B' : 'X';
             std::cout << display_char << " ";
         }
@@ -196,7 +227,7 @@ int main(int argc, char* argv[]){
     // =========================================
 
     double start = MPI_Wtime();
-    std::vector<int> states_old;
+    std::vector<int> states_current;
     int N;
     bool draw_grid = false;
 
@@ -216,7 +247,6 @@ int main(int argc, char* argv[]){
         N = atoi(argv[1]);
         int seed = atoi(argv[2]);
         float probability = atof(argv[3]);
-        draw_grid = atoi(argv[4]) != 0;
         
         // Input validation
         if (N <= 0) {
@@ -230,15 +260,21 @@ int main(int argc, char* argv[]){
         }
         
         // Generate initial grid from random
-        states_old = GenerateGrid(N, seed, probability);
+        states_current = GenerateGrid(N, seed, probability);
         }
 
       else{
         // Read grid from file
         std::string filename = argv[1];
-        states_old = ReadGridFromFile(filename, N);
-        draw_grid = atoi(argv[2]) != 0;
+        states_current = ReadGridFromFile(filename, N);
       }
+    }
+
+    if (argc == 5){
+      draw_grid = atoi(argv[4]);
+    }
+    else if (argc == 3){
+      draw_grid = atoi(argv[2]);
     }
 
     double setup_end = MPI_Wtime();
@@ -255,10 +291,10 @@ int main(int argc, char* argv[]){
       MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
       // resize the vector on non-root processes
       if (iproc != 0){
-        states_old.resize(N*N);
+        states_current.resize(N*N);
       }
       // now broadcast the actual grid data
-      MPI_Bcast(states_old.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);      
+      MPI_Bcast(states_current.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);      
     }
 
     double broadcast_end = MPI_Wtime();
@@ -284,28 +320,49 @@ int main(int argc, char* argv[]){
 
     double model_start = MPI_Wtime();
     std::vector<int> states_new(N*N, 0);
-    while (true) {
+    std::vector<int> ghost_row_above(N, 0);
+    std::vector<int> ghost_row_below(N, 0);
+    MPI_Status status;  // Declare status variable for MPI_Sendrecv
+    bool changes_made = true;
+
+    while (changes_made) {
+        // send ghost rows 
+      if (iproc > 0){
+          // get the row before
+          MPI_Sendrecv(&states_current[i0 * N], N, MPI_INT, iproc-1, 0, ghost_row_above.data(), N, MPI_INT, iproc-1, 1, MPI_COMM_WORLD, &status);
+      }
+      if (iproc < nproc-1){
+          // get the row after
+          MPI_Sendrecv(&states_current[(i1-1) * N], N, MPI_INT, iproc+1, 1, ghost_row_below.data(), N, MPI_INT, iproc+1, 0, MPI_COMM_WORLD, &status);
+      }
         burning_steps++;
-        Model(N, states_old, states_new, i0, i1, iproc, nproc);
-        if (burning_steps == N) {
-          break;
+        Model(N, states_current, states_new, i0, i1, iproc, nproc, ghost_row_above, ghost_row_below, changes_made);
+        if (draw_grid){
+          std::vector<int> combined_grid = CombineGrids(N, states_new, i0, i1, iproc, nproc);
+          if (iproc == 0){
+            // Display the grid
+            if (iproc == 0){
+              std::cout << "=========================================" << std::endl;
+              std::cout << "Step " << burning_steps << ":" << std::endl;
+              std::cout << "=========================================" << std::endl;
+            }
+            DisplayGrid(combined_grid, N);
+          }
         }
-        if (draw_grid && iproc == 0) {
-          std::cout << "=========================================" << std::endl;
-          std::cout << "Step " << burning_steps << ":" << std::endl;
-          std::cout << "=========================================" << std::endl;
-          DisplayGrid(states_old, N);
-        }
+      states_current = states_new; 
     }
     double model_end = MPI_Wtime();
 
     // check that the tasks stay in sync
     MPI_Barrier(MPI_COMM_WORLD);
 
+    // Get Final Results
+    std::vector<int> final_grid = CombineGrids(N, states_current, i0, i1, iproc, nproc);
+
     // check if bottom row on fire
     if (iproc == 0){
       for (int j=0;j<N;j++){
-          if (states_old[(N-1)*N + j] == burning || states_old[(N-1)*N + j] == burnt){
+          if (final_grid[(N-1)*N + j] == burning || final_grid[(N-1)*N + j] == burnt){
               bottom_reached = true;
               break;
           }

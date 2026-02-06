@@ -1,0 +1,12 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [2192888]: mask 0xc0000000c set
+cpu-bind=MASK - bp1-compute189, task  0  0 [2192916]: mask 0x4 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [2192917]: mask 0x400000000 set
+cpu-bind=MASK - bp1-compute189, task  2  2 [2192918]: mask 0x8 set
+cpu-bind=MASK - bp1-compute189, task  3  3 [2192919]: mask 0x800000000 set
+Running with 4 MPI processes
+Burning steps: 2388
+Bottom reached: No
+Execution time: 8.59629 seconds
+Setup time: 0.0272253 seconds
+Broadcast time: 0.00270628 seconds
+Model time: 8.56475 seconds

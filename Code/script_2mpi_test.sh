@@ -20,4 +20,4 @@
 module add openmpi/5.0.3-et6p
 
 # Submit
-srun --mpi=pmix_v2 ./test 1000 42 0.6 0
+srun --mpi=pmix_v2 ./test input_grid.txt 1

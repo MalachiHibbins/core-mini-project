@@ -7,10 +7,10 @@
 ## saving you from modifying each of these scripts individually.                            ##
 ##############################################################################################
 
-#SBATCH --job-name=image_2mpi
+#SBATCH --job-name=image_1mpi
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:00:10
 #SBATCH --mem-per-cpu=100M
@@ -20,4 +20,4 @@
 module add openmpi/5.0.3-et6p
 
 # Submit
-srun --mpi=pmix_v2 ./test 1000 42 0.6 0
+srun --mpi=pmix_v2 ./test input_grid.txt 1
