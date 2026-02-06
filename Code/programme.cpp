@@ -17,13 +17,13 @@ int Get1dIndex(int i, int j, int k, int N){
   return i * N + j;
 }
 
-void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid, int j0, int j1, int iproc, int nproc){
+void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid, int i0, int i1, int iproc, int nproc){
   // ============================================
   // Update the grid according to the rules of the model for 1 time step.
   // ============================================
   // Initialize to zeros - each process updates only its assigned cells  
-  for (int i=0;i<N;i++){
-    for (int j=j0;j<j1;j++){
+  for (int i=i0;i<i1;i++){
+    for (int j=0;j<N;j++){
       // convert 2D index to 1D index
       int ind = Get1dIndex(i, j, 0, N);
       int state = old_grid[ind];
@@ -111,9 +111,10 @@ std::vector < int > GenerateGrid(int N, int seed, float probability){
     for (int i=0;i<N*N;i++){
         grid[i] = GenerateRandomState(probability);
     }
+    // set the first column of the grid on fire
     for (int i=0;i<N;i++){
-        if (grid[i] == alive) {
-            grid[i] = burning;
+        if (grid[i * N] == alive) {
+            grid[i * N] = burning;
         }
     }
     return grid;
@@ -138,10 +139,10 @@ std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
         infile >> grid[i];
     }
 
-    // set the first row of the grid on fire
-    for (int j = 0; j < N; ++j) {
-        if (grid[j] == alive) {
-            grid[j] = burning;
+    // set the first column of the grid on fire
+    for (int i = 0; i < N; ++i) {
+        if (grid[i * N] == alive) {
+            grid[i * N] = burning;
         }
     }
     return grid;
@@ -240,6 +241,10 @@ int main(int argc, char* argv[]){
       }
     }
 
+    double setup_end = MPI_Wtime();
+    double broadcast_start = MPI_Wtime();
+    
+
     // =========================================
     // Broadcast entire grid size to all processes
     // =========================================
@@ -255,6 +260,8 @@ int main(int argc, char* argv[]){
       // now broadcast the actual grid data
       MPI_Bcast(states_old.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);      
     }
+
+    double broadcast_end = MPI_Wtime();
 
     // =========================================
     // Distribute the grid among processes
@@ -275,6 +282,7 @@ int main(int argc, char* argv[]){
     // check that the tasks stay in sync
     MPI_Barrier(MPI_COMM_WORLD);
 
+    double model_start = MPI_Wtime();
     std::vector<int> states_new(N*N, 0);
     while (true) {
         burning_steps++;
@@ -289,6 +297,7 @@ int main(int argc, char* argv[]){
           DisplayGrid(states_old, N);
         }
     }
+    double model_end = MPI_Wtime();
 
     // check that the tasks stay in sync
     MPI_Barrier(MPI_COMM_WORLD);
@@ -313,6 +322,9 @@ int main(int argc, char* argv[]){
       std::cout << "Burning steps: " << burning_steps << std::endl;
       std::cout << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
       std::cout << "Execution time: " << end - start << " seconds" << std::endl;
+      std::cout << "Setup time: " << setup_end - start << " seconds" << std::endl;
+      std::cout << "Broadcast time: " << broadcast_end - broadcast_start << " seconds" << std::endl;
+      std::cout << "Model time: " << model_end - model_start << " seconds" << std::endl;
     }
     
     // finalise MPI
