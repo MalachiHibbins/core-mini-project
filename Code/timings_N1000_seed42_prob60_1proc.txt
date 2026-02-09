@@ -3,8 +3,8 @@ Processors: 1
 Grid size: 1000x1000
 Burning steps: 2388
 Bottom reached: Yes
-Total execution time: 15.173 seconds
-Setup time: 0.0172478 seconds
-Broadcast time: 4.7e-08 seconds
-Distribute time: 2.9e-08 seconds
-Model time: 15.153 seconds
+Total execution time: 15.1885 seconds
+Setup time: 0.01685 seconds
+Broadcast time: 4.5e-08 seconds
+Distribute time: 2.7e-08 seconds
+Model time: 15.169 seconds

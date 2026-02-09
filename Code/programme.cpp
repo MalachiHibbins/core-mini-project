@@ -20,16 +20,28 @@ int Get1dIndex(int i, int j, int k, int N){
 // Forward declaration
 void distribute_grid(int N, int iproc, int nproc, int& i0, int& i1);
 
-std::vector <int> CombineGrids(int N, std::vector < int > & grid, int i0, int i1, int iproc, int nproc){
+std::vector <int> CombineGrids(int N, std::vector < int > & local_grid, int i0, int i1, int iproc, int nproc){
   std::vector<int> combined_grid(N*N, 0);
   if (nproc > 1){
-    // do a reduction 
-    MPI_Allreduce(grid.data(), combined_grid.data(), N*N, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    // Gather all local grids to root using MPI_Gatherv
+    std::vector<int> recvcounts(nproc);
+    std::vector<int> displs(nproc);
+    
+    // Calculate receive counts and displacements for each process
+    for (int p = 0; p < nproc; p++){
+      int p_i0, p_i1;
+      distribute_grid(N, p, nproc, p_i0, p_i1);
+      recvcounts[p] = (p_i1 - p_i0) * N;
+      displs[p] = p_i0 * N;
+    }
+    
+    MPI_Allgatherv(local_grid.data(), (i1-i0)*N, MPI_INT, 
+                   combined_grid.data(), recvcounts.data(), displs.data(), MPI_INT, MPI_COMM_WORLD);
     return combined_grid;
   }
   else{
     // only have 1 MPI task
-    return grid;
+    return local_grid;
   }
 }
 
@@ -41,12 +53,12 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
   changes_made = false;
   for (int i=i0;i<i1;i++){
     for (int j=0;j<N;j++){
-      // convert 2D index to 1D index
-      int ind = Get1dIndex(i, j, 0, N);
-      int state = old_grid[ind];
+      // convert to local index (i-i0 for local row storage)
+      int local_ind = (i - i0) * N + j;
+      int state = old_grid[local_ind];
       
       if (state == empty){
-        new_grid[ind] = empty;
+        new_grid[local_ind] = empty;
       }
       else if (state == alive){
         // check neighbours for fire
@@ -61,8 +73,8 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
             }
           } else if (i > i0){
             // Within my rows
-            int ind_up = Get1dIndex(i-1, j, 0, N);
-            if (old_grid[ind_up] == burning){
+            int local_ind_up = (i - 1 - i0) * N + j;
+            if (old_grid[local_ind_up] == burning){
               neighbour_on_fire = true;
             }
           }
@@ -77,8 +89,8 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
             }
           } else if (i < i1-1){
             // Within my rows
-            int ind_down = Get1dIndex(i+1, j, 0, N);
-            if (old_grid[ind_down] == burning){
+            int local_ind_down = (i + 1 - i0) * N + j;
+            if (old_grid[local_ind_down] == burning){
               neighbour_on_fire = true;
             }
           }
@@ -86,33 +98,33 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
         
         if (j > 0){
           // check left
-          int ind_left = Get1dIndex(i, j-1, 0, N);
-          if (old_grid[ind_left] == burning){
+          int local_ind_left = (i - i0) * N + (j - 1);
+          if (old_grid[local_ind_left] == burning){
             neighbour_on_fire = true;
           }
         }     
         if (j < N-1){
           // check right
-          int ind_right = Get1dIndex(i, j+1, 0, N);
-          if (old_grid[ind_right] == burning){
+          int local_ind_right = (i - i0) * N + (j + 1);
+          if (old_grid[local_ind_right] == burning){
             neighbour_on_fire = true;
           }
         }  
         
         if (neighbour_on_fire){
-          new_grid[ind] = burning;
+          new_grid[local_ind] = burning;
           changes_made = true;
         }
         else{
-          new_grid[ind] = alive;
+          new_grid[local_ind] = alive;
         }
       }
       else if (state == burning){
-        new_grid[ind] = burnt;
+        new_grid[local_ind] = burnt;
         changes_made = true;
       }
       else if (state == burnt){
-        new_grid[ind] = burnt;
+        new_grid[local_ind] = burnt;
       }
       
     }
@@ -300,10 +312,6 @@ int main(int argc, char* argv[]){
     if (nproc > 1){
       // first share the image size
       MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
-      // resize the vector on non-root processes
-      if (iproc != 0){
-        states_current.resize(N*N);
-      }
     }
 
     // =========================================
@@ -314,20 +322,30 @@ int main(int argc, char* argv[]){
     int i0, i1;
     distribute_grid(N, iproc, nproc, i0, i1);
 
-    // Send/receive the relevant rows
+    // Send/receive the relevant rows and reshape to local storage
     if (nproc > 1){
-      // now distribute the relevant rows to each process
       if (iproc == 0){
-        // Process 0 sends relevant rows to each other process
+        // Process 0: keep full grid temporarily to send to others
+        std::vector<int> full_grid = states_current;
+        
+        // Send relevant rows to each other process
         for (int p = 1; p < nproc; p++){
           int p_i0, p_i1;
           distribute_grid(N, p, nproc, p_i0, p_i1);
-          MPI_Send(&states_current[p_i0 * N], (p_i1 - p_i0) * N, MPI_INT, p, 0, MPI_COMM_WORLD);
+          MPI_Send(&full_grid[p_i0 * N], (p_i1 - p_i0) * N, MPI_INT, p, 0, MPI_COMM_WORLD);
         }
-        // Process 0 already has the full grid
+        
+        // Now extract process 0's own local rows
+        states_current.resize((i1 - i0) * N);
+        for (int i = i0; i < i1; i++){
+          for (int j = 0; j < N; j++){
+            states_current[(i - i0) * N + j] = full_grid[i * N + j];
+          }
+        }
       } else {
-        // Other processes receive their rows from process 0
-        MPI_Recv(&states_current[i0 * N], (i1 - i0) * N, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // Other processes: allocate space and receive their rows
+        states_current.resize((i1 - i0) * N);
+        MPI_Recv(states_current.data(), (i1 - i0) * N, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
     }
 
@@ -348,7 +366,7 @@ int main(int argc, char* argv[]){
     // check that the tasks stay in sync
     MPI_Barrier(MPI_COMM_WORLD);
 
-    std::vector<int> states_new(N*N, 0);
+    std::vector<int> states_new((i1 - i0) * N, 0); // Only store local rows
     std::vector<int> ghost_row_above(N, 0);
     std::vector<int> ghost_row_below(N, 0);
     MPI_Status status;  // Declare status variable for MPI_Sendrecv
@@ -357,13 +375,12 @@ int main(int argc, char* argv[]){
     while (changes_made) {
         // send ghost rows 
       if (iproc > 0){
-          // get the row before
-          // todo: update to send receive to improve speed
-          MPI_Sendrecv(&states_current[i0 * N], N, MPI_INT, iproc-1, 0, ghost_row_above.data(), N, MPI_INT, iproc-1, 1, MPI_COMM_WORLD, &status);
+          // Send first local row, receive ghost from above
+          MPI_Sendrecv(&states_current[0], N, MPI_INT, iproc-1, 0, ghost_row_above.data(), N, MPI_INT, iproc-1, 1, MPI_COMM_WORLD, &status);
       }
       if (iproc < nproc-1){
-          // get the row after
-          MPI_Sendrecv(&states_current[(i1-1) * N], N, MPI_INT, iproc+1, 1, ghost_row_below.data(), N, MPI_INT, iproc+1, 0, MPI_COMM_WORLD, &status);
+          // Send last local row, receive ghost from below
+          MPI_Sendrecv(&states_current[(i1-i0-1) * N], N, MPI_INT, iproc+1, 1, ghost_row_below.data(), N, MPI_INT, iproc+1, 0, MPI_COMM_WORLD, &status);
       }
         burning_steps++;
         Model(N, states_current, states_new, i0, i1, iproc, nproc, ghost_row_above, ghost_row_below, changes_made);
