@@ -1,0 +1,42 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [2347180]: mask 0xff000000ff0 set
+cpu-bind=MASK - bp1-compute189, task  0  0 [2347206]: mask 0x10 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [2347207]: mask 0x1000000000 set
+cpu-bind=MASK - bp1-compute189, task  2  2 [2347208]: mask 0x20 set
+cpu-bind=MASK - bp1-compute189, task  3  3 [2347209]: mask 0x2000000000 set
+cpu-bind=MASK - bp1-compute189, task  4  4 [2347210]: mask 0x40 set
+cpu-bind=MASK - bp1-compute189, task  5  5 [2347211]: mask 0x4000000000 set
+cpu-bind=MASK - bp1-compute189, task  6  6 [2347212]: mask 0x80 set
+cpu-bind=MASK - bp1-compute189, task  7  7 [2347213]: mask 0x8000000000 set
+cpu-bind=MASK - bp1-compute189, task  8  8 [2347214]: mask 0x100 set
+cpu-bind=MASK - bp1-compute189, task  9  9 [2347215]: mask 0x10000000000 set
+cpu-bind=MASK - bp1-compute189, task 10 10 [2347216]: mask 0x200 set
+cpu-bind=MASK - bp1-compute189, task 11 11 [2347217]: mask 0x20000000000 set
+cpu-bind=MASK - bp1-compute189, task 12 12 [2347218]: mask 0x400 set
+cpu-bind=MASK - bp1-compute189, task 13 13 [2347219]: mask 0x40000000000 set
+cpu-bind=MASK - bp1-compute189, task 14 14 [2347220]: mask 0x800 set
+cpu-bind=MASK - bp1-compute189, task 15 15 [2347221]: mask 0x80000000000 set
+Running with 16 MPI processes
+[bp1-compute189:2347207] *** Process received signal ***
+[bp1-compute189:2347207] Signal: Segmentation fault (11)
+[bp1-compute189:2347207] Signal code: Address not mapped (1)
+[bp1-compute189:2347207] Failing at address: 0x1c2a2c0
+[bp1-compute189:2347207] [ 0] /lib64/libpthread.so.0(+0x12cf0)[0x7f1f8829dcf0]
+[bp1-compute189:2347207] [ 1] /lib64/libc.so.6(+0xceff6)[0x7f1f87f94ff6]
+[bp1-compute189:2347207] [ 2] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libopen-pal.so.80(opal_convertor_unpack+0x88)[0x7f1f88e97b18]
+[bp1-compute189:2347207] [ 3] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libmpi.so.40(mca_pml_ob1_recv_request_progress_rndv+0x237)[0x7f1f88c65d77]
+[bp1-compute189:2347207] [ 4] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libmpi.so.40(+0x20952b)[0x7f1f88c5f52b]
+[bp1-compute189:2347207] [ 5] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libmpi.so.40(+0x209899)[0x7f1f88c5f899]
+[bp1-compute189:2347207] [ 6] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libopen-pal.so.80(mca_btl_sm_poll_handle_frag+0x88)[0x7f1f88f28eb8]
+[bp1-compute189:2347207] [ 7] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libopen-pal.so.80(+0xec1fb)[0x7f1f88f291fb]
+[bp1-compute189:2347207] [ 8] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libopen-pal.so.80(opal_progress+0x2b)[0x7f1f88e6222b]
+[bp1-compute189:2347207] [ 9] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libmpi.so.40(mca_pml_ob1_recv+0x320)[0x7f1f88c573e0]
+[bp1-compute189:2347207] [10] /software/spack/linux-rocky8-broadwell/gcc-12.3.0/openmpi-5.0.3-et6p/lib/libmpi.so.40(PMPI_Recv+0x18e)[0x7f1f88b1b81e]
+[bp1-compute189:2347207] [11] /user/home/vv23510/core-mini-project/Code/./test[0x404b1b]
+[bp1-compute189:2347207] [12] /lib64/libc.so.6(__libc_start_main+0xe5)[0x7f1f87f00d85]
+[bp1-compute189:2347207] [13] /user/home/vv23510/core-mini-project/Code/./test[0x40507e]
+[bp1-compute189:2347207] *** End of error message ***
+srun: error: bp1-compute189: task 1: Segmentation fault (core dumped)
+slurmstepd: error:  mpi/pmix_v2: _errhandler: bp1-compute189 [0]: pmixp_client_v2.c:212: Error handler invoked: status = -25, source = [slurm.pmix.15586206.0:1]
+srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
+slurmstepd: error: *** STEP 15586206.0 ON bp1-compute189 CANCELLED AT 2026-02-09T09:39:40 ***
+srun: error: bp1-compute189: tasks 0,2-15: Killed

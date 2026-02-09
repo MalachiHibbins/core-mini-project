@@ -1,0 +1,14 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [2203840]: mask 0x400000004 set
+cpu-bind=MASK - bp1-compute189, task  0  0 [2203866]: mask 0x4 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [2203867]: mask 0x400000000 set
+Running with 2 MPI processes
+srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
+[bp1-compute189:00000] *** An error occurred in MPI_Sendrecv
+[bp1-compute189:00000] *** reported by process [3596943360,1]
+[bp1-compute189:00000] *** on communicator MPI_COMM_WORLD
+[bp1-compute189:00000] *** MPI_ERR_BUFFER: invalid buffer pointer
+[bp1-compute189:00000] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[bp1-compute189:00000] ***    and MPI will try to terminate your MPI job as well)
+slurmstepd: error: *** STEP 15540549.0 ON bp1-compute189 CANCELLED AT 2026-02-06T17:03:59 ***
+srun: error: bp1-compute189: task 0: Killed
+srun: error: bp1-compute189: task 1: Exited with exit code 1

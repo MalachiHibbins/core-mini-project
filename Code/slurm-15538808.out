@@ -1,7 +1,0 @@
-cpu-bind=MASK - bp1-compute189, task  0  0 [2182281]: mask 0x100000001 set
-cpu-bind=MASK - bp1-compute189, task  0  0 [2182307]: mask 0x1 set
-cpu-bind=MASK - bp1-compute189, task  1  1 [2182308]: mask 0x100000000 set
-Running with 2 MPI processes
-slurmstepd: error: *** JOB 15538808 ON bp1-compute189 CANCELLED AT 2026-02-06T15:01:40 DUE TO TIME LIMIT ***
-srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
-slurmstepd: error: *** STEP 15538808.0 ON bp1-compute189 CANCELLED AT 2026-02-06T15:01:40 DUE TO TIME LIMIT ***

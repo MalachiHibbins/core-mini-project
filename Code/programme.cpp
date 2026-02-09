@@ -117,6 +117,7 @@ void Model(int N, std::vector < int > & old_grid, std::vector < int > & new_grid
       
     }
   }
+  // check if any changes were made across all processes
   MPI_Allreduce(MPI_IN_PLACE, &changes_made, 1, MPI_CXX_BOOL, MPI_LOR, MPI_COMM_WORLD);
 }
 
@@ -178,15 +179,15 @@ std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
     return grid;
 }
 
-void DisplayGrid(const std::vector<int>& grid, int N){
+void DisplayGrid(const std::vector<int>& grid, int N, std::ostream& output = std::cout){
     // Displays the grid transposed (rows become columns, columns become rows)
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < N; ++j) {
             int state = grid[j * N + i];  // Transpose: swap i and j indices
             char display_char = (state == empty) ? '.' : (state == alive) ? 'T' : (state == burning) ? 'B' : 'X';
-            std::cout << display_char << " ";
+            output << display_char << " ";
         }
-        std::cout << std::endl;
+        output << std::endl;
     }
 }
 
@@ -230,6 +231,11 @@ int main(int argc, char* argv[]){
     std::vector<int> states_current;
     int N;
     bool draw_grid = false;
+    std::string run_description;  // For filename generation
+    int seed = 0;
+    float probability = 0.0;
+    std::string input_filename = "";
+    std::vector<int> my_states_current;
 
     if (iproc == 0) {
         std::cout << "Running with " << nproc << " MPI processes" << std::endl;
@@ -245,8 +251,8 @@ int main(int argc, char* argv[]){
       else if (argc == 5){
 
         N = atoi(argv[1]);
-        int seed = atoi(argv[2]);
-        float probability = atof(argv[3]);
+        seed = atoi(argv[2]);
+        probability = atof(argv[3]);
         
         // Input validation
         if (N <= 0) {
@@ -261,12 +267,18 @@ int main(int argc, char* argv[]){
         
         // Generate initial grid from random
         states_current = GenerateGrid(N, seed, probability);
+        run_description = "N" + std::to_string(N) + "_seed" + std::to_string(seed) + "_prob" + std::to_string((int)(probability*100));
         }
 
       else{
         // Read grid from file
-        std::string filename = argv[1];
-        states_current = ReadGridFromFile(filename, N);
+        input_filename = argv[1];
+        states_current = ReadGridFromFile(input_filename, N);
+        // Extract filename without path and extension
+        size_t last_slash = input_filename.find_last_of("/\\");
+        size_t last_dot = input_filename.find_last_of(".");
+        std::string base_name = input_filename.substr(last_slash + 1, last_dot - last_slash - 1);
+        run_description = "file_" + base_name;
       }
     }
 
@@ -280,7 +292,6 @@ int main(int argc, char* argv[]){
     double setup_end = MPI_Wtime();
     double broadcast_start = MPI_Wtime();
     
-
     // =========================================
     // Broadcast entire grid size to all processes
     // =========================================
@@ -293,19 +304,35 @@ int main(int argc, char* argv[]){
       if (iproc != 0){
         states_current.resize(N*N);
       }
-      // now broadcast the actual grid data
-      MPI_Bcast(states_current.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);      
     }
-
-    double broadcast_end = MPI_Wtime();
 
     // =========================================
     // Distribute the grid among processes
     // =========================================
 
-    // divide the rows among MPI tasks
+    // divide the rows among MPI tasks - must be done AFTER N is broadcast
     int i0, i1;
     distribute_grid(N, iproc, nproc, i0, i1);
+
+    // Send/receive the relevant rows
+    if (nproc > 1){
+      // now distribute the relevant rows to each process
+      if (iproc == 0){
+        // Process 0 sends relevant rows to each other process
+        for (int p = 1; p < nproc; p++){
+          int p_i0, p_i1;
+          distribute_grid(N, p, nproc, p_i0, p_i1);
+          MPI_Send(&states_current[p_i0 * N], (p_i1 - p_i0) * N, MPI_INT, p, 0, MPI_COMM_WORLD);
+        }
+        // Process 0 already has the full grid
+      } else {
+        // Other processes receive their rows from process 0
+        MPI_Recv(&states_current[i0 * N], (i1 - i0) * N, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      }
+    }
+
+    double broadcast_end = MPI_Wtime();
+    double distribute_time_start = MPI_Wtime();
 
     // =========================================
     // Run the simulation
@@ -314,11 +341,13 @@ int main(int argc, char* argv[]){
     int burning_steps = 0;
     bool bottom_reached = false;
 
-    // run simulation until no changes occur or max iterations reached
+    double distribute_time_end = MPI_Wtime();
+    double model_start = MPI_Wtime();
+
+    
     // check that the tasks stay in sync
     MPI_Barrier(MPI_COMM_WORLD);
 
-    double model_start = MPI_Wtime();
     std::vector<int> states_new(N*N, 0);
     std::vector<int> ghost_row_above(N, 0);
     std::vector<int> ghost_row_below(N, 0);
@@ -329,6 +358,7 @@ int main(int argc, char* argv[]){
         // send ghost rows 
       if (iproc > 0){
           // get the row before
+          // todo: update to send receive to improve speed
           MPI_Sendrecv(&states_current[i0 * N], N, MPI_INT, iproc-1, 0, ghost_row_above.data(), N, MPI_INT, iproc-1, 1, MPI_COMM_WORLD, &status);
       }
       if (iproc < nproc-1){
@@ -370,20 +400,59 @@ int main(int argc, char* argv[]){
     }
 
     // =========================================
-    // Output results
+    // Output timings
     // =========================================
 
     if (iproc == 0){
-      // Output results
+      // Output results to console
       double end = MPI_Wtime();
       std::cout << "Burning steps: " << burning_steps << std::endl;
       std::cout << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
       std::cout << "Execution time: " << end - start << " seconds" << std::endl;
-      std::cout << "Setup time: " << setup_end - start << " seconds" << std::endl;
-      std::cout << "Broadcast time: " << broadcast_end - broadcast_start << " seconds" << std::endl;
-      std::cout << "Model time: " << model_end - model_start << " seconds" << std::endl;
+      
+      // Write timings to file
+      std::string timing_filename = "timings_" + run_description + "_" + std::to_string(nproc) + "proc.txt";
+      std::ofstream timing_file(timing_filename);
+      if (timing_file.is_open()){
+        timing_file << "Run: " << run_description << std::endl;
+        timing_file << "Processors: " << nproc << std::endl;
+        timing_file << "Grid size: " << N << "x" << N << std::endl;
+        timing_file << "Burning steps: " << burning_steps << std::endl;
+        timing_file << "Bottom reached: " << (bottom_reached ? "Yes" : "No") << std::endl;
+        timing_file << "Total execution time: " << end - start << " seconds" << std::endl;
+        timing_file << "Setup time: " << setup_end - start << " seconds" << std::endl;
+        timing_file << "Broadcast time: " << broadcast_end - broadcast_start << " seconds" << std::endl;
+        timing_file << "Distribute time: " << distribute_time_end - distribute_time_start << " seconds" << std::endl;
+        timing_file << "Model time: " << model_end - model_start << " seconds" << std::endl;
+        timing_file.close();
+        std::cout << "Timings written to " << timing_filename << std::endl;
+      }
+
+      // =========================================
+      // Output Grid
+      // =========================================
+      
+      // Write grid data to file
+      std::string data_filename = "data_" + run_description + "_" + std::to_string(nproc) + "proc.txt";
+      std::ofstream data_file(data_filename);
+      if (data_file.is_open()){
+        data_file << "Final grid (" << N << "x" << N << ")" << std::endl;
+        // Write grid in transposed format
+        DisplayGrid(final_grid, N, data_file);
+        data_file.close();
+        std::cout << "Grid data written to " << data_filename << std::endl;
+      }
     }
+
+    // =========================================
+    // Display final grid to console if requested
+    // =========================================
     
+    if (iproc == 0 && draw_grid){
+      std::cout << "Final grid:" << std::endl;
+      DisplayGrid(final_grid, N);
+    }
+
     // finalise MPI
     MPI_Finalize();
     return 0;

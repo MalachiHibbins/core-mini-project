@@ -1,0 +1,9 @@
+Run: N1000_seed42_prob60
+Processors: 2
+Grid size: 1000x1000
+Burning steps: 2388
+Bottom reached: Yes
+Total execution time: 12.1025 seconds
+Setup time: 0.0265689 seconds
+Broadcast time: 0.0023079 seconds
+Model time: 12.0677 seconds
