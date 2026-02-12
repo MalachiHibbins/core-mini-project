@@ -354,7 +354,7 @@ void ParseArgumentsAndGenerateGrids(const int argc, char* argv[], const int ipro
 /*
 Output statistics and results to datafile, timings file and console
 */
-void OutputStatisticsAndResults(const int iproc, const int nproc, const int N, const bool draw_grid, const std::string& run_description, const double start, const double setup_end, const std::vector<int>& burning_steps_list, const std::vector<bool>& bottom_reached_list, const std::vector<double>& execution_time_list, const std::vector<double>& broadcast_allocate_time_list, const std::vector<int>& final_grid){
+void OutputStatisticsAndResults(const int iproc, const int nproc, const int N, const bool draw_grid, const std::string& run_description, const double start, const double setup_end, const std::vector<int>& burning_steps_list, const std::vector<bool>& bottom_reached_list, const std::vector<double>& execution_time_list, const std::vector<double>& broadcast_allocate_time_list, const std::vector<int>& final_grid, const float probability){
   
   
   
@@ -392,10 +392,18 @@ void OutputStatisticsAndResults(const int iproc, const int nproc, const int N, c
   std::cout << "Mean Broadcast/Allocate time (seconds): " << avg_broadcast_allocate_time << std::endl;
   
   // ============================================
-  // Write timings to file
+  // Check for BurningSteps.txt and decide output mode
   // ============================================
-  const std::string timing_filename = "timings_" + run_description + "_" + std::to_string(nproc) + "proc.txt"; // generate filename based on run description and number of processes
-  std::ofstream timing_file(timing_filename);
+  std::ifstream check_burning_steps("BurningSteps.txt");
+  bool burning_steps_exists = check_burning_steps.good();
+  check_burning_steps.close();
+
+  if (!burning_steps_exists) {
+    // ============================================
+    // Write timings to file
+    // ============================================
+    const std::string timing_filename = "timings_" + run_description + "_" + std::to_string(nproc) + "proc.txt"; // generate filename based on run description and number of processes
+    std::ofstream timing_file(timing_filename);
   if (!timing_file.is_open()) {
     std::cerr << "Error: Unable to write to file " << timing_filename << std::endl;
     return;
@@ -424,25 +432,40 @@ void OutputStatisticsAndResults(const int iproc, const int nproc, const int N, c
       if (i < execution_time_list.size() - 1) timing_file << ", ";
     }
     timing_file << std::endl;
-  timing_file.close();
-  
-  std::cout << "Timings written to " << timing_filename << std::endl;
+    timing_file.close();
+    
+    std::cout << "Timings written to " << timing_filename << std::endl;
 
-  // ============================================
-  // Write out grid to data file (for last run)
-  // ============================================
-  const std::string data_filename = "data_" + run_description + "_" + std::to_string(nproc) + "proc.txt"; // generate filename based on run description and number of processes
-  std::ofstream data_file(data_filename);
-  if (data_file.is_open()){
-    data_file << "Final grid (" << N << "x" << N << ")" << std::endl;
-    DisplayGrid(final_grid, N, data_file);
-    data_file.close();
-    std::cout << "Grid data written to " << data_filename << std::endl;
-  }
+    // ============================================
+    // Write out grid to data file (for last run)
+    // ============================================
+    const std::string data_filename = "data_" + run_description + "_" + std::to_string(nproc) + "proc.txt"; // generate filename based on run description and number of processes
+    std::ofstream data_file(data_filename);
+    if (data_file.is_open()){
+      data_file << "Final grid (" << N << "x" << N << ")" << std::endl;
+      DisplayGrid(final_grid, N, data_file);
+      data_file.close();
+      std::cout << "Grid data written to " << data_filename << std::endl;
+    }
 
-  if (draw_grid){
-    std::cout << "Final grid:" << std::endl;
-    DisplayGrid(final_grid, N);
+    if (draw_grid){
+      std::cout << "Final grid:" << std::endl;
+      DisplayGrid(final_grid, N);
+    }
+  } else {
+    // ============================================
+    // Append to BurningSteps.txt if it exists
+    // ============================================
+    std::ofstream burning_steps_file("BurningSteps.txt", std::ios::app);
+    if (burning_steps_file.is_open()) {
+      burning_steps_file << probability;
+      for (size_t i = 0; i < burning_steps_list.size(); i++) {
+        burning_steps_file << ", " << burning_steps_list[i];
+      }
+      burning_steps_file << std::endl;
+      burning_steps_file.close();
+      std::cout << "Results appended to BurningSteps.txt" << std::endl;
+    }
   }
 }
 
@@ -637,7 +660,7 @@ int main(int argc, char* argv[]){
     // =========================================
     OutputStatisticsAndResults(iproc, nproc, N, draw_grid, run_description, start, setup_end,
                                   burning_steps_list, bottom_reached_list, 
-                                  execution_time_list, broadcast_allocate_time_list, final_grid);
+                                  execution_time_list, broadcast_allocate_time_list, final_grid, probability);
 
     // finalise MPI
     MPI_Finalize();

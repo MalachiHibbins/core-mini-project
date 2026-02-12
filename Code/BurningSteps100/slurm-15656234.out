@@ -1,0 +1,49 @@
+cpu-bind=MASK - bp1-compute189, task  0  0 [324612]: mask 0x1fe000001fe0 set
+Running with probability 0.01
+cpu-bind=MASK - bp1-compute189, task  0  0 [324716]: mask 0x20 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [324717]: mask 0x2000000000 set
+cpu-bind=MASK - bp1-compute189, task  2  2 [324718]: mask 0x40 set
+cpu-bind=MASK - bp1-compute189, task  3  3 [324719]: mask 0x4000000000 set
+cpu-bind=MASK - bp1-compute189, task  4  4 [324727]: mask 0x80 set
+cpu-bind=MASK - bp1-compute189, task  5  5 [324728]: mask 0x8000000000 set
+cpu-bind=MASK - bp1-compute189, task  6  6 [324729]: mask 0x100 set
+cpu-bind=MASK - bp1-compute189, task  7  7 [324730]: mask 0x10000000000 set
+cpu-bind=MASK - bp1-compute189, task  8  8 [324731]: mask 0x200 set
+cpu-bind=MASK - bp1-compute189, task  9  9 [324734]: mask 0x20000000000 set
+cpu-bind=MASK - bp1-compute189, task 10 10 [324736]: mask 0x400 set
+cpu-bind=MASK - bp1-compute189, task 11 11 [324737]: mask 0x40000000000 set
+cpu-bind=MASK - bp1-compute189, task 12 12 [324738]: mask 0x800 set
+cpu-bind=MASK - bp1-compute189, task 13 13 [324739]: mask 0x80000000000 set
+cpu-bind=MASK - bp1-compute189, task 14 14 [324741]: mask 0x1000 set
+cpu-bind=MASK - bp1-compute189, task 15 15 [324744]: mask 0x100000000000 set
+Running with 16 MPI processes
+Mean Burning steps: -0.44
+Estimated Probability Bottom reached: 0.02
+Mean Execution time (seconds): 5.9334e-05
+Mean Broadcast/Allocate time (seconds): 2.56328e-05
+Timings written to timings_N100_seed42_prob1_16proc.txt
+Grid data written to data_N100_seed42_prob1_16proc.txt
+Running with probability 0.41
+cpu-bind=MASK - bp1-compute189, task  0  0 [325022]: mask 0x20 set
+cpu-bind=MASK - bp1-compute189, task  1  1 [325023]: mask 0x2000000000 set
+cpu-bind=MASK - bp1-compute189, task  2  2 [325024]: mask 0x40 set
+cpu-bind=MASK - bp1-compute189, task  3  3 [325025]: mask 0x4000000000 set
+cpu-bind=MASK - bp1-compute189, task  4  4 [325026]: mask 0x80 set
+cpu-bind=MASK - bp1-compute189, task  5  5 [325027]: mask 0x8000000000 set
+cpu-bind=MASK - bp1-compute189, task  6  6 [325028]: mask 0x100 set
+cpu-bind=MASK - bp1-compute189, task  7  7 [325029]: mask 0x10000000000 set
+cpu-bind=MASK - bp1-compute189, task  8  8 [325030]: mask 0x200 set
+cpu-bind=MASK - bp1-compute189, task  9  9 [325031]: mask 0x20000000000 set
+cpu-bind=MASK - bp1-compute189, task 10 10 [325032]: mask 0x400 set
+cpu-bind=MASK - bp1-compute189, task 11 11 [325033]: mask 0x40000000000 set
+cpu-bind=MASK - bp1-compute189, task 12 12 [325034]: mask 0x800 set
+cpu-bind=MASK - bp1-compute189, task 13 13 [325035]: mask 0x80000000000 set
+cpu-bind=MASK - bp1-compute189, task 14 14 [325036]: mask 0x1000 set
+cpu-bind=MASK - bp1-compute189, task 15 15 [325037]: mask 0x100000000000 set
+Running with 16 MPI processes
+Mean Burning steps: 12.08
+Estimated Probability Bottom reached: 0.53
+Mean Execution time (seconds): 0.000294883
+Mean Broadcast/Allocate time (seconds): 2.44149e-05
+Timings written to timings_N100_seed42_prob41_16proc.txt
+Grid data written to data_N100_seed42_prob41_16proc.txt
