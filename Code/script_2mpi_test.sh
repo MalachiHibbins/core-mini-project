@@ -10,7 +10,7 @@
 #SBATCH --job-name=image_2mpi
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:00:10
 #SBATCH --mem-per-cpu=100M

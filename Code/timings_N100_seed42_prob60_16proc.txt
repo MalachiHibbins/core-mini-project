@@ -1,0 +1,12 @@
+Run: N100_seed42_prob60
+Number of runs: 3
+Processors: 16
+Grid size: 100x100
+Mean Burning steps: 240
+Estimated Probability Bottom reached: 1
+Mean Execution time (seconds): 0.00501988
+Mean Broadcast/Allocate time (seconds): 0.000105746
+Setup time: 0.00132847 seconds
+
+Burning steps per run: 153, 308, 259
+Execution time per run (seconds): 0.003867, 0.00604331, 0.00514934

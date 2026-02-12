@@ -1,0 +1,24 @@
+cpu-bind=MASK - bp1-compute010, task  0  0 [2512082]: mask 0xff0000ff set
+cpu-bind=MASK - bp1-compute010, task  0  0 [2512108]: mask 0x1 set
+cpu-bind=MASK - bp1-compute010, task  1  1 [2512109]: mask 0x1000000 set
+cpu-bind=MASK - bp1-compute010, task  2  2 [2512110]: mask 0x2 set
+cpu-bind=MASK - bp1-compute010, task  3  3 [2512111]: mask 0x2000000 set
+cpu-bind=MASK - bp1-compute010, task  4  4 [2512112]: mask 0x4 set
+cpu-bind=MASK - bp1-compute010, task  5  5 [2512113]: mask 0x4000000 set
+cpu-bind=MASK - bp1-compute010, task  6  6 [2512114]: mask 0x8 set
+cpu-bind=MASK - bp1-compute010, task  7  7 [2512115]: mask 0x8000000 set
+cpu-bind=MASK - bp1-compute010, task  8  8 [2512116]: mask 0x10 set
+cpu-bind=MASK - bp1-compute010, task  9  9 [2512117]: mask 0x10000000 set
+cpu-bind=MASK - bp1-compute010, task 10 10 [2512118]: mask 0x20 set
+cpu-bind=MASK - bp1-compute010, task 11 11 [2512119]: mask 0x20000000 set
+cpu-bind=MASK - bp1-compute010, task 12 12 [2512120]: mask 0x40 set
+cpu-bind=MASK - bp1-compute010, task 13 13 [2512121]: mask 0x40000000 set
+cpu-bind=MASK - bp1-compute010, task 14 14 [2512122]: mask 0x80 set
+cpu-bind=MASK - bp1-compute010, task 15 15 [2512123]: mask 0x80000000 set
+Running with 16 MPI processes
+Mean Burning steps: 0.83
+Estimated Probability Bottom reached: 0.17
+Mean Execution time (seconds): 9.23307e-05
+Mean Broadcast/Allocate time (seconds): 2.9886e-05
+Timings written to timings_N100_seed42_prob10_16proc.txt
+Grid data written to data_N100_seed42_prob10_16proc.txt

@@ -7,7 +7,10 @@
 #include <cmath>
 #include <mpi.h>
 
-// Cell state constants
+
+/**
+ * enumeration specifiying the meaning of the integer values used to represent the state of each cell in the grid. 
+ */
 enum CellState {
     EMPTY = 0,
     ALIVE = 1,
@@ -16,10 +19,15 @@ enum CellState {
 };
 
 
-void distribute_grid(const int N, const int iproc, const int nproc, int& row_start, int& row_end){
-  // ============================================
-  // Distribute the grid among processes by dividing into 2D slices. Each process gets a contiguous block
-  // ============================================
+/**
+  *Distribute the grid among processes by dividing into 2D slices. Each process gets a contiguous block.*
+  *N - the size of the grid (N x N)*
+  *iproc - proccess unique identifier*
+  *nproc - total number of processes running*
+  *row_start - initially empty but set to the first row the prcess has been allocated
+  *row_end - initially empty but set to the first row the prcess has been allocated*
+*/
+void DistributeGrid(const int N, const int iproc, const int nproc, int& row_start, int& row_end){
   const int n_slices = N / nproc;
   const int remainder = N % nproc;
   if (iproc < remainder){
@@ -31,6 +39,16 @@ void distribute_grid(const int N, const int iproc, const int nproc, int& row_sta
   }
 }
 
+
+/**
+ * Puts together the smaller grids stored on each process to restore the overall grid
+ *N - the size of the grid (N x N)*
+ *local_grid - the grid allocated to each process*
+ *row_start - the row index corresponding to the overall grid that the first local row corresponds to*
+ *row_end - the row index corresponding to the overall grid that the firs last local row corresponds to*
+ *iproc - proccess unique identifier*
+ *nproc - total number of processes running*
+ */
 std::vector <int> CombineGrids(const int N, const std::vector < int > & local_grid, const int row_start, const int row_end, const int iproc, const int nproc){
   std::vector<int> combined_grid(N*N, 0);
   if (nproc > 1){
@@ -41,11 +59,12 @@ std::vector <int> CombineGrids(const int N, const std::vector < int > & local_gr
     // Calculate receive counts and displacements for each process
     for (int p = 0; p < nproc; p++){
       int p_row_start, p_row_end;
-      distribute_grid(N, p, nproc, p_row_start, p_row_end);
+      DistributeGrid(N, p, nproc, p_row_start, p_row_end);
       recvcounts[p] = (p_row_end - p_row_start) * N;
       displs[p] = p_row_start * N;
     }
     
+    // very slow
     MPI_Allgatherv(local_grid.data(), (row_end-row_start)*N, MPI_INT, 
                    combined_grid.data(), recvcounts.data(), displs.data(), MPI_INT, MPI_COMM_WORLD);
     return combined_grid;
@@ -56,15 +75,24 @@ std::vector <int> CombineGrids(const int N, const std::vector < int > & local_gr
   }
 }
 
+
+/*
+Update the grid according to the rules of the model for 1 time step. Each process updates only its assigned rows.
+- checks if cell is alive and if so checks neighbours for fire (using ghost rows if at boundary)
+- if cell is burning, becomes burnt
+- empty and burnt cells remain unchanged
+*N - the size of the grid (N x N)*
+*old_grid - grid which this process needs to update*
+*new_grid - grid which has been updated*
+*row_start - the row index corresponding to the overall grid that the first local row corresponds to*
+*row_end - the row index corresponding to the overall grid that the firs last local row corresponds to*
+*iproc - proccess unique identifier*
+*nproc - total number of processes running*
+*ghoast_row_below - read only row used when chekcing bottom row for fire*
+*ghoast_row_above - read only row used when checking top row for fire*
+*/
 void Model(const int N, const std::vector < int > & old_grid, std::vector < int > & new_grid, const int row_start, const int row_end, const int iproc, const int nproc, const std::vector<int> & ghost_row_above, const std::vector<int> & ghost_row_below, bool & changes_made){
-  // ============================================
-  // Update the grid according to the rules of the model for 1 time step.
-  // Each process updates only its assigned rows 
-  // - converts to 1D local indexing for easier storage of local rows
-  // - checks if cell is alive and if so checks neighbours for fire (using ghost rows if at boundary)
-  // - if cell is burning, becomes burnt
-  // - empty and burnt cells remain unchanged
-  // ============================================
+
   changes_made = false;
   for (int i=row_start;i<row_end;i++){
     for (int j=0;j<N;j++){
@@ -142,12 +170,16 @@ void Model(const int N, const std::vector < int > & old_grid, std::vector < int 
       
     }
   }
-  // check if any changes were made across all processes
+  // check if any changes were made across all processes by doing all_reduce on changes made
+  // not super time consuming since changes made is boolean so only 1 bit sent per process
   MPI_Allreduce(MPI_IN_PLACE, &changes_made, 1, MPI_CXX_BOOL, MPI_LOR, MPI_COMM_WORLD);
 }
 
+
+/*
+Generates a random state: tree with given probability, otherwise no tree
+*/
 int GenerateRandomState(const float probability){
-    // Generates a random state: tree with given probability, otherwise no tree
     float random_value = (float)rand() / RAND_MAX;  // Random float between 0 and 1
     if (random_value < probability) {
         return ALIVE;
@@ -155,8 +187,8 @@ int GenerateRandomState(const float probability){
     return EMPTY;
 }
 
-void SetFirstColumnOnFire(std::vector<int>& grid, const int N){
-    // Sets the first column of the grid on fire
+
+void SetFirstRowOnFire(std::vector<int>& grid, const int N){
     for (int i=0;i<N;i++){
         if (grid[i * N] == ALIVE) {
             grid[i * N] = BURNING;
@@ -164,8 +196,11 @@ void SetFirstColumnOnFire(std::vector<int>& grid, const int N){
     }
 }
 
+/*
+Creates the grid, sets top row on fire
+*/
 std::vector < int > GenerateGrid(const int N, const int seed, const float probability){
-    // Creates the grid with each cell being a tree with given probability. Trees in the top row are set on fire.
+    // 
     
     std::vector < int > grid(N*N, 0);
     srand(seed);  // Seed once at the start
@@ -173,18 +208,18 @@ std::vector < int > GenerateGrid(const int N, const int seed, const float probab
         grid[i] = GenerateRandomState(probability);
     }
     // set the first column of the grid on fire
-    SetFirstColumnOnFire(grid, N);
+    SetFirstRowOnFire(grid, N);
     return grid;
 }
 
-std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
-    // ============================================
-    // Read in grid file separated by spaces.
-    // - checks file exists
-    // - auto-detects grid size (must be square)
-    // - reads in values in transposed order (columns become rows) to ensure more even
-    // ============================================
 
+/*
+Read in grid file separated by spaces.
+- checks file exists
+- auto-detects grid size (must be square)
+- reads in values in transposed order (columns become rows) to ensure more even
+*/
+std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
     // check file exists
     std::ifstream infile(filename);
     if (!infile) {
@@ -220,10 +255,11 @@ std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
     
     // Reset file to beginning and read all values
     infile.clear();
-    infile.seekg(0);
+    infile.seekg(0); // moves read position back tos tart of file
     
     // read grid values into vector
     // read columns in as rows (i.e. first N values are row 0, next N values are row 1 etc.)
+    // explained in report why columns read in as rows
     std::vector<int> grid(N * N);
     for (int i = 0; i < N * N; ++i) {
         int col = i / N;   
@@ -232,15 +268,15 @@ std::vector<int> ReadGridFromFile(const std::string filename, int& N) {
     }
 
     // set the first column of the grid on fire
-    SetFirstColumnOnFire(grid, N);
+    SetFirstRowOnFire(grid, N);
     return grid;
 }
 
+
+/*
+Displays the grid transposed (rows become columns, columns become rows)
+*/
 void DisplayGrid(const std::vector<int>& grid, const int N, std::ostream& output = std::cout){
-    // ============================================
-    // Displays the grid transposed (rows become columns, columns become rows)
-    // Different processors are more likely to have even workloads
-    // ============================================
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < N; ++j) {
             int state = grid[j * N + i];  // Transpose: swap i and j indices
@@ -251,10 +287,11 @@ void DisplayGrid(const std::vector<int>& grid, const int N, std::ostream& output
     }
 }
 
-void parse_arguments_and_generate_grids(const int argc, char* argv[], const int iproc, const int nproc, int& N, int& num_runs, int& seed, float& probability, bool& draw_grid, std::string& run_description, std::vector<std::vector<int>>& full_grids){
-  // ============================================
-  // Parse command line arguments and generate grids on root process
-  // ============================================
+
+/*
+Parse command line arguments and generate grids on root process
+*/
+void ParseArgumentsAndGenerateGrids(const int argc, char* argv[], const int iproc, const int nproc, int& N, int& num_runs, int& seed, float& probability, bool& draw_grid, std::string& run_description, std::vector<std::vector<int>>& full_grids){
   if (iproc == 0){
     // Argument parsing
     if (argc != 6 && argc != 3) {
@@ -314,11 +351,12 @@ void parse_arguments_and_generate_grids(const int argc, char* argv[], const int 
   }
 }
 
-void output_statistics_and_results(const int iproc, const int nproc, const int N, const bool draw_grid, const std::string& run_description, const double start, const double setup_end, const std::vector<int>& burning_steps_list, const std::vector<bool>& bottom_reached_list, const std::vector<double>& execution_time_list, const std::vector<double>& broadcast_allocate_time_list, const std::vector<int>& final_grid){
+/*
+Output statistics and results to datafile, timings file and console
+*/
+void OutputStatisticsAndResults(const int iproc, const int nproc, const int N, const bool draw_grid, const std::string& run_description, const double start, const double setup_end, const std::vector<int>& burning_steps_list, const std::vector<bool>& bottom_reached_list, const std::vector<double>& execution_time_list, const std::vector<double>& broadcast_allocate_time_list, const std::vector<int>& final_grid){
   
-  // ============================================
-  // Output statistics and results
-  // ============================================
+  
   
   // Only root process outputs results
   if (iproc != 0) {
@@ -409,7 +447,7 @@ void output_statistics_and_results(const int iproc, const int nproc, const int N
 }
 
 int main(int argc, char* argv[]){
-
+  
     // =========================================
     // Initialise MPI
     // =========================================
@@ -441,9 +479,12 @@ int main(int argc, char* argv[]){
     float probability;
     std::vector<std::vector<int>> full_grids;
     std::vector<int> full_grid;
+    std::string run_description;  // For filename generation
+
+    // checks user argument inputs are valid and generates grids on root process
+    ParseArgumentsAndGenerateGrids(argc, argv, iproc, nproc, N, num_runs, seed, probability, draw_grid, run_description, full_grids);
 
     // Storage for results
-    std::string run_description;  // For filename generation
     std::vector<int> burning_steps_list;
     std::vector<bool> bottom_reached_list;
     std::vector<double> execution_time_list;
@@ -453,17 +494,13 @@ int main(int argc, char* argv[]){
         std::cout << "Running with " << nproc << " MPI processes" << std::endl;
     }
     
-    // Parse arguments and generate grids
-    parse_arguments_and_generate_grids(argc, argv, iproc, nproc, N, num_runs, seed, probability, 
-                                       draw_grid, run_description, full_grids);
-    
     // =========================================
     // Broadcast entire grid size to all processes
     // =========================================
 
     // broadcast the data
     if (nproc > 1){
-      // first share the image size
+      // send image size, number of runs and if to draw the grid from root to all other processes
       MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
       MPI_Bcast(&num_runs, 1, MPI_INT, 0, MPI_COMM_WORLD);
       MPI_Bcast(&draw_grid, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
@@ -473,9 +510,9 @@ int main(int argc, char* argv[]){
     // Distribute the grid among processes
     // =========================================
 
-    // divide the rows among MPI tasks - must be done AFTER N is broadcast
+    // divide the rows among MPI tasks
     int row_start, row_end;
-    distribute_grid(N, iproc, nproc, row_start, row_end);
+    DistributeGrid(N, iproc, nproc, row_start, row_end);
     double setup_end = MPI_Wtime();
 
     // =========================================
@@ -484,18 +521,18 @@ int main(int argc, char* argv[]){
 
     for (int irun = 0; irun < num_runs; irun++){
       double broadcast_allocate_start = MPI_Wtime();
-      // Send/receive the relevant rows and reshape to local storage
       if (nproc > 1){
         if (iproc == 0){
           full_grid = full_grids[irun];        
-          // Send relevant rows to each other process
           for (int p = 1; p < nproc; p++){
+            //Find (on the root node) the specific rows that each process needs
             int p_row_start, p_row_end;
-            distribute_grid(N, p, nproc, p_row_start, p_row_end);
+            DistributeGrid(N, p, nproc, p_row_start, p_row_end);
+            // Send relavent parts of full_grid to each process
             MPI_Send(&full_grid[p_row_start * N], (p_row_end - p_row_start) * N, MPI_INT, p, 0, MPI_COMM_WORLD);
           }
           
-          // Now extract process 0's own local rows
+          // state 0 extract its own local rows from current grid and store in states current
           states_current.resize((row_end - row_start) * N);
           for (int i = row_start; i < row_end; i++){
             for (int j = 0; j < N; j++){
@@ -503,7 +540,7 @@ int main(int argc, char* argv[]){
             }
           }
         } else {
-          // Other processes: allocate space and receive their rows
+          // Other processes: allocate space and receive their rows on there node
           states_current.resize((row_end - row_start) * N);
           MPI_Recv(states_current.data(), (row_end - row_start) * N, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
@@ -518,10 +555,16 @@ int main(int argc, char* argv[]){
       // Run the simulation
       // =========================================
       
-      int burning_steps = 0;
-      bool bottom_reached = false;
-      double model_start = MPI_Wtime();
+      // simulation variables 
+      int burning_steps;
+      bool bottom_reached;
+      double model_start;
 
+      if (iproc == 0){
+        burning_steps= 0;
+        bottom_reached = false;
+        model_start = MPI_Wtime();
+      }
       
       // check that the tasks stay in sync
       MPI_Barrier(MPI_COMM_WORLD);
@@ -532,8 +575,7 @@ int main(int argc, char* argv[]){
       MPI_Status status;  // Declare status variable for MPI_Sendrecv
       bool changes_made = true;
 
-      while (changes_made) {
-          // send ghost rows 
+      while (changes_made) { 
         if (iproc > 0){
             // Send first local row, receive ghost from above
             MPI_Sendrecv(&states_current[0], N, MPI_INT, iproc-1, 0, ghost_row_above.data(), N, MPI_INT, iproc-1, 1, MPI_COMM_WORLD, &status);
@@ -542,21 +584,26 @@ int main(int argc, char* argv[]){
             // Send last local row, receive ghost from below
             MPI_Sendrecv(&states_current[(row_end-row_start-1) * N], N, MPI_INT, iproc+1, 1, ghost_row_below.data(), N, MPI_INT, iproc+1, 0, MPI_COMM_WORLD, &status);
         }
-          burning_steps++;
           Model(N, states_current, states_new, row_start, row_end, iproc, nproc, ghost_row_above, ghost_row_below, changes_made);
+
+          // Draws grid if specified by user in parameters
+          // Warning this adds significant overahead since CombineGrids uses MPI_Allgatherv
           if (draw_grid){
+            // grids need combining since each process only stores the data they process
             std::vector<int> combined_grid = CombineGrids(N, states_new, row_start, row_end, iproc, nproc);
             if (iproc == 0){
-              // Display the grid
               std::cout << "=========================================" << std::endl;
-              std::cout << "Step " << burning_steps << ":" << std::endl;
+              std::cout << "Step " << burning_steps<< ":" << std::endl;
               std::cout << "=========================================" << std::endl;
               DisplayGrid(combined_grid, N);
             }
           }
+        if (iproc == 0){
+          burning_steps++;
+        }
+          
         states_current = states_new; 
       }
-      double model_end = MPI_Wtime();
 
       // check that the tasks stay in sync
       MPI_Barrier(MPI_COMM_WORLD);
@@ -577,6 +624,8 @@ int main(int argc, char* argv[]){
       // Store results for this run
       // =========================================
       if (iproc == 0){
+        burning_steps= burning_steps- 2; // subtract 1 for the final step where no changes are made, code checks for changes in the grid rather than checking if fire has reached the bottom row. subtract another 1 since we are counting number of steps not number of states.
+        double model_end = MPI_Wtime();
         burning_steps_list.push_back(burning_steps);
         bottom_reached_list.push_back(bottom_reached);
         execution_time_list.push_back(model_end - model_start);
@@ -586,7 +635,7 @@ int main(int argc, char* argv[]){
     // =========================================
     // Output statistics and results
     // =========================================
-    output_statistics_and_results(iproc, nproc, N, draw_grid, run_description, start, setup_end,
+    OutputStatisticsAndResults(iproc, nproc, N, draw_grid, run_description, start, setup_end,
                                   burning_steps_list, bottom_reached_list, 
                                   execution_time_list, broadcast_allocate_time_list, final_grid);
 
